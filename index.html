@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>外務システム端末</title>
+    <style>
+        body {
+            background-color: #000;
+            color: #0f0;
+            font-family: 'Courier New', Courier, monospace; /* 等幅フォント */
+            margin: 0;
+            padding: 40px;
+            font-size: 18px;
+            line-height: 1.6;
+            overflow-y: auto;
+        }
+        /* CRTモニター風の光彩効果 */
+        #terminal { text-shadow: 0 0 5px #0f0; }
+        .text-line { margin-bottom: 10px; }
+        .option-line { cursor: pointer; display: block; margin-bottom: 5px; }
+        .option-line:hover { background-color: #0f0; color: #000; }
+        .cursor { animation: blink 1s step-end infinite; }
+        
+        /* 入力エリアのスタイル */
+        #input-container { display: none; margin-top: 15px; align-items: center; }
+        .prompt-symbol { margin-right: 10px; }
+        #user-input {
+            background: transparent;
+            border: none;
+            color: #0f0;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 18px;
+            outline: none;
+            width: 80%;
+            text-shadow: 0 0 5px #0f0;
+        }
+        
+        @keyframes blink { 50% { opacity: 0; } }
+    </style>
+</head>
+<body>
+
+<div id="terminal"></div>
+<div id="input-container">
+    <span class="prompt-symbol">&gt;</span>
+    <input type="text" id="user-input" autocomplete="off" placeholder="| (入力待ち | を点滅)">
+</div>
+
+<script>
+// ======== 設定 ========
+// Github Pagesなどで同じ階層に置く場合は 'data.json'
+const DATA_URL = 'data.json'; 
+// 事前に準備したBotのAPIサーバーのURL
+const BOT_API_URL = 'http://localhost:3000/api/send-message'; 
+const BOT_SECRET_KEY = 'Webサイトからの不正なリクエストを防ぐための合言葉';
+// ======================
+
+let scenarioData = {};
+let currentSceneId = 'root';
+let selectedDiscordOption = null; // Discord送信待ちのオプション
+
+const terminal = document.getElementById('terminal');
+const inputContainer = document.getElementById('input-container');
+const userInput = document.getElementById('user-input');
+
+// データの読み込み
+async function init() {
+    try {
+        const res = await fetch(DATA_URL);
+        scenarioData = await res.json();
+        renderScene(currentSceneId);
+    } catch (e) {
+        terminal.innerHTML = `<div class="text-line">システムエラー: データの読み込みに失敗しました。</div>`;
+    }
+}
+
+// シーンの描画
+async function renderScene(sceneId) {
+    terminal.innerHTML = '';
+    inputContainer.style.display = 'none';
+    userInput.value = '';
+    selectedDiscordOption = null;
+
+    const scene = scenarioData[sceneId];
+    if (!scene) return;
+
+    // テキストの分割とタイプライター風表示
+    const lines = scene.text.split('\n');
+    for (const line of lines) {
+        await typeText(`－ ${line}`);
+    }
+
+    // 選択肢の表示
+    if (scene.options && scene.options.length > 0) {
+        let optionsHtml = '<div style="margin-top:20px;">－ ';
+        scene.options.forEach((opt, index) => {
+            optionsHtml += `<span class="option-line" onclick="handleOptionSelect(${index})">${opt.text}</span>`;
+        });
+        optionsHtml += '</div>';
+        terminal.innerHTML += optionsHtml;
+    }
+}
+
+// タイプライター演出（一文字ずつ表示）
+function typeText(text) {
+    return new Promise(resolve => {
+        const div = document.createElement('div');
+        div.className = 'text-line';
+        terminal.appendChild(div);
+        
+        let i = 0;
+        const interval = setInterval(() => {
+            div.textContent = text.substring(0, i + 1) + (i < text.length - 1 ? '█' : '');
+            i++;
+            if (i === text.length) {
+                clearInterval(interval);
+                div.textContent = text;
+                resolve();
+            }
+        }, 30); // 表示スピード（ミリ秒）
+    });
+}
+
+// 選択肢が選ばれたときの処理
+window.handleOptionSelect = function(optionIndex) {
+    const scene = scenarioData[currentSceneId];
+    const opt = scene.options[optionIndex];
+
+    if (opt.requireInput) {
+        // 入力が必要な場合、入力欄を表示
+        inputContainer.style.display = 'flex';
+        userInput.focus();
+        selectedDiscordOption = opt;
+    } else {
+        // 入力が不要ならすぐに次のシーンへ
+        currentSceneId = opt.next;
+        renderScene(currentSceneId);
+    }
+};
+
+// 入力欄でEnterキーが押されたときの処理
+userInput.addEventListener('keydown', async (e) => {
+    if (e.key === 'Enter' && userInput.value.trim() !== '') {
+        const textToSend = userInput.value.trim();
+        inputContainer.style.display = 'none';
+        
+        // Discordへ送信フラグが立っている場合
+        if (selectedDiscordOption && selectedDiscordOption.sendDiscord) {
+            await typeText("－ 通信中...");
+            try {
+                await fetch(BOT_API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        secretKey: BOT_SECRET_KEY,
+                        messageContent: textToSend
+                    })
+                });
+            } catch (error) {
+                await typeText("－ 通信エラー: メッセージの送信に失敗しました。");
+            }
+        }
+        
+        // 次のシーンへ遷移
+        currentSceneId = selectedDiscordOption.next;
+        renderScene(currentSceneId);
+    }
+});
+
+// システム起動
+init();
+</script>
+</body>
+</html>
