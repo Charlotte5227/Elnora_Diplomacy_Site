@@ -1,0 +1,21 @@
+{
+  "root": {
+    "text": "外務システムより応答します。\n要件を選択してください。",
+    "options": [
+      { "text": "1. 状況の確認", "next": "info", "requireInput": false, "sendDiscord": false },
+      { "text": "2. 本国への直接通信要請", "next": "comm", "requireInput": true, "sendDiscord": true }
+    ]
+  },
+  "info": {
+    "text": "現在システムは正常に稼働しています。",
+    "options": [
+      { "text": "0. 戻る", "next": "root", "requireInput": false, "sendDiscord": false }
+    ]
+  },
+  "comm": {
+    "text": "通信を暗号化して送信しました。\n担当官からの応答をお待ちください。",
+    "options": [
+      { "text": "0. 終了する", "next": "root", "requireInput": false, "sendDiscord": false }
+    ]
+  }
+}
