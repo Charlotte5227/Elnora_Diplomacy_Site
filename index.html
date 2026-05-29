@@ -7,21 +7,19 @@
         body {
             background-color: #000;
             color: #0f0;
-            font-family: 'Courier New', Courier, monospace; /* 等幅フォント */
+            font-family: 'Courier New', Courier, monospace;
             margin: 0;
             padding: 40px;
             font-size: 18px;
             line-height: 1.6;
             overflow-y: auto;
         }
-        /* CRTモニター風の光彩効果 */
         #terminal { text-shadow: 0 0 5px #0f0; }
         .text-line { margin-bottom: 10px; }
         .option-line { cursor: pointer; display: block; margin-bottom: 5px; }
         .option-line:hover { background-color: #0f0; color: #000; }
         .cursor { animation: blink 1s step-end infinite; }
         
-        /* 入力エリアのスタイル */
         #input-container { display: none; margin-top: 15px; align-items: center; }
         .prompt-symbol { margin-right: 10px; }
         #user-input {
@@ -47,23 +45,33 @@
 </div>
 
 <script>
-// ======== 設定 ========
-// Github Pagesなどで同じ階層に置く場合は 'data.json'
+// ==========================================
+// 【必須設定】ここだけ環境に合わせて変更してください
+// ==========================================
+
+// ① 読み込むシナリオデータのURL
+// ※同じフォルダ内に data.json を置く場合は 'data.json' でOK
+// ※GitHubから直接読み込む場合はRawデータのURLを指定（例: 'https://raw.githubusercontent.com/ユーザー名/リポジトリ名/main/data.json'）
 const DATA_URL = 'data.json'; 
-// 事前に準備したBotのAPIサーバーのURL
+
+// ② BotサーバーのURL
+// ※ローカルでテストする間は 'http://localhost:3000/api/send-message'
+// ※公開した後は 'https://あなたのサーバーURL/api/send-message'
 const BOT_API_URL = 'http://localhost:3000/api/send-message'; 
-const BOT_SECRET_KEY = 'Webサイトからの不正なリクエストを防ぐための合言葉';
-// ======================
+
+// ③ Bot側のコードで設定した API_SECRET_KEY と「全く同じ合言葉」
+const BOT_SECRET_KEY = 'Elnora_Secret_Key_2026'; 
+
+// ==========================================
 
 let scenarioData = {};
 let currentSceneId = 'root';
-let selectedDiscordOption = null; // Discord送信待ちのオプション
+let selectedDiscordOption = null;
 
 const terminal = document.getElementById('terminal');
 const inputContainer = document.getElementById('input-container');
 const userInput = document.getElementById('user-input');
 
-// データの読み込み
 async function init() {
     try {
         const res = await fetch(DATA_URL);
@@ -74,7 +82,6 @@ async function init() {
     }
 }
 
-// シーンの描画
 async function renderScene(sceneId) {
     terminal.innerHTML = '';
     inputContainer.style.display = 'none';
@@ -84,13 +91,11 @@ async function renderScene(sceneId) {
     const scene = scenarioData[sceneId];
     if (!scene) return;
 
-    // テキストの分割とタイプライター風表示
     const lines = scene.text.split('\n');
     for (const line of lines) {
         await typeText(`－ ${line}`);
     }
 
-    // 選択肢の表示
     if (scene.options && scene.options.length > 0) {
         let optionsHtml = '<div style="margin-top:20px;">－ ';
         scene.options.forEach((opt, index) => {
@@ -101,7 +106,6 @@ async function renderScene(sceneId) {
     }
 }
 
-// タイプライター演出（一文字ずつ表示）
 function typeText(text) {
     return new Promise(resolve => {
         const div = document.createElement('div');
@@ -117,34 +121,29 @@ function typeText(text) {
                 div.textContent = text;
                 resolve();
             }
-        }, 30); // 表示スピード（ミリ秒）
+        }, 30);
     });
 }
 
-// 選択肢が選ばれたときの処理
 window.handleOptionSelect = function(optionIndex) {
     const scene = scenarioData[currentSceneId];
     const opt = scene.options[optionIndex];
 
     if (opt.requireInput) {
-        // 入力が必要な場合、入力欄を表示
         inputContainer.style.display = 'flex';
         userInput.focus();
         selectedDiscordOption = opt;
     } else {
-        // 入力が不要ならすぐに次のシーンへ
         currentSceneId = opt.next;
         renderScene(currentSceneId);
     }
 };
 
-// 入力欄でEnterキーが押されたときの処理
 userInput.addEventListener('keydown', async (e) => {
     if (e.key === 'Enter' && userInput.value.trim() !== '') {
         const textToSend = userInput.value.trim();
         inputContainer.style.display = 'none';
         
-        // Discordへ送信フラグが立っている場合
         if (selectedDiscordOption && selectedDiscordOption.sendDiscord) {
             await typeText("－ 通信中...");
             try {
@@ -161,13 +160,11 @@ userInput.addEventListener('keydown', async (e) => {
             }
         }
         
-        // 次のシーンへ遷移
         currentSceneId = selectedDiscordOption.next;
         renderScene(currentSceneId);
     }
 });
 
-// システム起動
 init();
 </script>
 </body>
