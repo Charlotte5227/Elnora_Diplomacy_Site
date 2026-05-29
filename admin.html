@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>エルノーラ外務システム - 管理コンソール</title>
+    <title>外務システム - 管理コンソール</title>
     <style>
         body { font-family: sans-serif; background: #f4f5f7; margin: 0; padding: 20px; color: #333; }
         .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
@@ -29,9 +29,9 @@
     
     <div class="github-settings">
         <h3>GitHub連携設定</h3>
-        <input type="text" id="gh-owner" placeholder="ユーザー名 (例: yourname)">
-        <input type="text" id="gh-repo" placeholder="リポジトリ名 (例: elnora-sys)">
-        <input type="text" id="gh-path" placeholder="ファイルパス (例: data.json)" value="data.json">
+        <input type="text" id="gh-owner" value="Charlotte5227" placeholder="ユーザ名">
+        <input type="text" id="gh-repo" value="Elnora_Diplomacy_Site" placeholder="リポジトリ名">
+        <input type="text" id="gh-path" value="data.json" placeholder="ファイルパス">
         <input type="password" id="gh-token" placeholder="GitHub Token (PAT)">
         <button onclick="loadFromGithub()">データを読み込む</button>
     </div>
@@ -43,17 +43,16 @@
 </div>
 
 <script>
-// デフォルトのシナリオデータ（W.R.M.Num-1の設定を反映）
 let scenarioData = {
     "root": {
-        text: "エルノーラ外務システムより応答します。\n要件を選択してください。",
+        text: "外務システムより応答します。\n要件を選択してください。",
         options: [
-            { text: "1. フェノポリカ第三帝政について", next: "info", requireInput: false, sendDiscord: false },
+            { text: "1. 状況の確認", next: "info", requireInput: false, sendDiscord: false },
             { text: "2. 本国への直接通信要請", next: "comm", requireInput: true, sendDiscord: true }
         ]
     },
     "info": {
-        text: "フェノポリカ第三帝政はW.R.M.Num-1で最も強い国家です。\nエルノーラとの国力差は2倍以上離れています。\n本地域における圧倒的強者であり、実質的な支配者です。",
+        text: "現在システムは正常に稼働しています。",
         options: [
             { text: "0. 戻る", next: "root", requireInput: false, sendDiscord: false }
         ]
@@ -68,7 +67,6 @@ let scenarioData = {
 
 let currentSha = null;
 
-// UIの描画
 function renderEditor() {
     const container = document.getElementById('editor-container');
     container.innerHTML = '';
@@ -100,7 +98,6 @@ function renderEditor() {
     }
 }
 
-// データ更新用関数
 function updateSceneText(id, val) { scenarioData[id].text = val; }
 function updateOption(sceneId, optIndex, key, val) { scenarioData[sceneId].options[optIndex][key] = val; }
 function addScene() {
@@ -114,7 +111,6 @@ function deleteScene(id) { if(confirm(`${id}を削除しますか？`)) { delete
 function addOption(sceneId) { scenarioData[sceneId].options.push({ text: "", next: "", requireInput: false, sendDiscord: false }); renderEditor(); }
 function deleteOption(sceneId, index) { scenarioData[sceneId].options.splice(index, 1); renderEditor(); }
 
-// GitHubから読み込み (日本語対応のBase64デコード)
 async function loadFromGithub() {
     const owner = document.getElementById('gh-owner').value;
     const repo = document.getElementById('gh-repo').value;
@@ -137,7 +133,6 @@ async function loadFromGithub() {
     }
 }
 
-// GitHubへ保存 (日本語対応のBase64エンコード)
 async function saveToGithub() {
     const owner = document.getElementById('gh-owner').value;
     const repo = document.getElementById('gh-repo').value;
