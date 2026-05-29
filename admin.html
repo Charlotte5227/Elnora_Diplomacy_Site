@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>エルノーラ外務システム - 管理コンソール</title>
+    <style>
+        body { font-family: sans-serif; background: #f4f5f7; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1, h2 { color: #2c3e50; }
+        .github-settings { background: #e8f0fe; padding: 15px; border-radius: 6px; margin-bottom: 20px; }
+        .github-settings input { margin-right: 10px; padding: 8px; width: 180px; border: 1px solid #ccc; border-radius: 4px; }
+        .scene-card { border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 6px; background: #fafafa; }
+        .scene-card h3 { margin-top: 0; display: flex; justify-content: space-between; }
+        textarea { width: 100%; height: 80px; margin-bottom: 10px; padding: 8px; box-sizing: border-box; }
+        .option-row { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; background: #fff; padding: 10px; border: 1px solid #eee; }
+        .option-row input[type="text"] { flex: 1; padding: 6px; }
+        button { padding: 8px 16px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #2980b9; }
+        .btn-danger { background: #e74c3c; }
+        .btn-danger:hover { background: #c0392b; }
+        .btn-success { background: #2ecc71; font-weight: bold; width: 100%; margin-top: 20px; padding: 12px; }
+        .btn-success:hover { background: #27ae60; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>システム管理コンソール</h1>
+    
+    <div class="github-settings">
+        <h3>GitHub連携設定</h3>
+        <input type="text" id="gh-owner" placeholder="ユーザー名 (例: yourname)">
+        <input type="text" id="gh-repo" placeholder="リポジトリ名 (例: elnora-sys)">
+        <input type="text" id="gh-path" placeholder="ファイルパス (例: data.json)" value="data.json">
+        <input type="password" id="gh-token" placeholder="GitHub Token (PAT)">
+        <button onclick="loadFromGithub()">データを読み込む</button>
+    </div>
+
+    <div id="editor-container"></div>
+    <button onclick="addScene()">+ 新しいシーンを追加</button>
+    
+    <button class="btn-success" onclick="saveToGithub()">GitHubへ保存 (Commit)</button>
+</div>
+
+<script>
+// デフォルトのシナリオデータ（W.R.M.Num-1の設定を反映）
+let scenarioData = {
+    "root": {
+        text: "エルノーラ外務システムより応答します。\n要件を選択してください。",
+        options: [
+            { text: "1. フェノポリカ第三帝政について", next: "info", requireInput: false, sendDiscord: false },
+            { text: "2. 本国への直接通信要請", next: "comm", requireInput: true, sendDiscord: true }
+        ]
+    },
+    "info": {
+        text: "フェノポリカ第三帝政はW.R.M.Num-1で最も強い国家です。\nエルノーラとの国力差は2倍以上離れています。\n本地域における圧倒的強者であり、実質的な支配者です。",
+        options: [
+            { text: "0. 戻る", next: "root", requireInput: false, sendDiscord: false }
+        ]
+    },
+    "comm": {
+        text: "通信を暗号化して送信しました。\n担当官からの応答をお待ちください。",
+        options: [
+            { text: "0. 終了する", next: "root", requireInput: false, sendDiscord: false }
+        ]
+    }
+};
+
+let currentSha = null;
+
+// UIの描画
+function renderEditor() {
+    const container = document.getElementById('editor-container');
+    container.innerHTML = '';
+
+    for (const [sceneId, scene] of Object.entries(scenarioData)) {
+        const card = document.createElement('div');
+        card.className = 'scene-card';
+        
+        let optionsHtml = '';
+        scene.options.forEach((opt, index) => {
+            optionsHtml += `
+                <div class="option-row">
+                    <input type="text" placeholder="選択肢のテキスト" value="${opt.text}" onchange="updateOption('${sceneId}', ${index}, 'text', this.value)">
+                    <input type="text" placeholder="遷移先のシーンID" value="${opt.next}" onchange="updateOption('${sceneId}', ${index}, 'next', this.value)">
+                    <label><input type="checkbox" ${opt.requireInput ? 'checked' : ''} onchange="updateOption('${sceneId}', ${index}, 'requireInput', this.checked)"> 入力を要求</label>
+                    <label><input type="checkbox" ${opt.sendDiscord ? 'checked' : ''} onchange="updateOption('${sceneId}', ${index}, 'sendDiscord', this.checked)"> Discordへ送信</label>
+                    <button class="btn-danger" onclick="deleteOption('${sceneId}', ${index})">削除</button>
+                </div>
+            `;
+        });
+
+        card.innerHTML = `
+            <h3>ID: ${sceneId} <button class="btn-danger" onclick="deleteScene('${sceneId}')">シーン削除</button></h3>
+            <textarea placeholder="表示するテキスト" onchange="updateSceneText('${sceneId}', this.value)">${scene.text}</textarea>
+            <div>${optionsHtml}</div>
+            <button onclick="addOption('${sceneId}')">+ 選択肢を追加</button>
+        `;
+        container.appendChild(card);
+    }
+}
+
+// データ更新用関数
+function updateSceneText(id, val) { scenarioData[id].text = val; }
+function updateOption(sceneId, optIndex, key, val) { scenarioData[sceneId].options[optIndex][key] = val; }
+function addScene() {
+    const id = prompt("新しいシーンのIDを半角英数字で入力してください:", "new_scene");
+    if (id && !scenarioData[id]) {
+        scenarioData[id] = { text: "", options: [] };
+        renderEditor();
+    }
+}
+function deleteScene(id) { if(confirm(`${id}を削除しますか？`)) { delete scenarioData[id]; renderEditor(); } }
+function addOption(sceneId) { scenarioData[sceneId].options.push({ text: "", next: "", requireInput: false, sendDiscord: false }); renderEditor(); }
+function deleteOption(sceneId, index) { scenarioData[sceneId].options.splice(index, 1); renderEditor(); }
+
+// GitHubから読み込み (日本語対応のBase64デコード)
+async function loadFromGithub() {
+    const owner = document.getElementById('gh-owner').value;
+    const repo = document.getElementById('gh-repo').value;
+    const path = document.getElementById('gh-path').value;
+    const token = document.getElementById('gh-token').value;
+
+    try {
+        const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+            headers: token ? { 'Authorization': `token ${token}` } : {}
+        });
+        if (!res.ok) throw new Error("読み込み失敗");
+        const data = await res.json();
+        currentSha = data.sha;
+        const decoded = decodeURIComponent(escape(window.atob(data.content)));
+        scenarioData = JSON.parse(decoded);
+        renderEditor();
+        alert("データを読み込みました。");
+    } catch (e) {
+        alert("エラー: " + e.message);
+    }
+}
+
+// GitHubへ保存 (日本語対応のBase64エンコード)
+async function saveToGithub() {
+    const owner = document.getElementById('gh-owner').value;
+    const repo = document.getElementById('gh-repo').value;
+    const path = document.getElementById('gh-path').value;
+    const token = document.getElementById('gh-token').value;
+
+    if (!token) return alert("保存するにはGitHub Tokenが必要です。");
+
+    const content = window.btoa(unescape(encodeURIComponent(JSON.stringify(scenarioData, null, 2))));
+    
+    try {
+        const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `token ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                message: "Update scenario data from Admin UI",
+                content: content,
+                sha: currentSha
+            })
+        });
+        if (!res.ok) throw new Error("保存失敗");
+        const data = await res.json();
+        currentSha = data.content.sha;
+        alert("GitHubにセーブされました！");
+    } catch (e) {
+        alert("エラー: " + e.message);
+    }
+}
+
+renderEditor();
+</script>
+</body>
+</html>
