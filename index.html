@@ -41,7 +41,7 @@
 <div id="terminal"></div>
 <div id="input-container">
     <span class="prompt-symbol">&gt;</span>
-    <input type="text" id="user-input" autocomplete="off" placeholder="| (入力待ち | を点滅)">
+    <input type="text" id="user-input" autocomplete="off" placeholder="(入力待ち...　文章を入力してください)">
 </div>
 
 <script>
@@ -139,6 +139,7 @@ window.handleOptionSelect = function(optionIndex) {
     }
 };
 
+// ▼▼▼ ここからコピーして差し替える ▼▼▼
 userInput.addEventListener('keydown', async (e) => {
     if (e.key === 'Enter' && userInput.value.trim() !== '') {
         const textToSend = userInput.value.trim();
@@ -147,23 +148,35 @@ userInput.addEventListener('keydown', async (e) => {
         if (selectedDiscordOption && selectedDiscordOption.sendDiscord) {
             await typeText("－ 通信中...");
             try {
-                await fetch(BOT_API_URL, {
+                const response = await fetch(BOT_API_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'ngrok-skip-browser-warning': 'true' // ngrokのセキュリティブロックを突破する合言葉
+                    },
                     body: JSON.stringify({
                         secretKey: BOT_SECRET_KEY,
                         messageContent: textToSend
                     })
                 });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || "サーバーエラーが発生しました");
+                }
             } catch (error) {
-                await typeText("－ 通信エラー: メッセージの送信に失敗しました。");
+                // エラー時は画面を止めて、詳細を表示する
+                await typeText("－ ❌ 致命的エラー: " + error.message);
+                return; 
             }
         }
         
+        // 通信が「成功」した場合のみ、次のシーンへ遷移する
         currentSceneId = selectedDiscordOption.next;
         renderScene(currentSceneId);
     }
 });
+// ▲▲▲ 差し替えここまで ▲▲▲
 
 init();
 </script>
